@@ -63,15 +63,25 @@ router.get('/', async (req, res) => {
     const total = parseInt(countResult.rows[0].total)
 
     //    SELECT paginado — LIMIT pega N linhas, OFFSET pula N anteriores
-    //    JOINs trazem nome do recurso e do abrigo (mais util pro frontend)
+    //    JOINs trazem nome do recurso e do abrigo (util pro frontend)
+    //    LEFT JOIN match_doacao agrega qtd_em_entrega: total ja "comprometido"
+    //    via matches ativos (proposto/aceito/em_entrega). Permite mostrar
+    //    "precisa 200 unidades · 130 em entrega" no frontend.
     const itemsResult = await pool.query(
       `SELECT n.*,
               t.nome AS tipo_nome, t.categoria, t.unidade_medida,
-              a.nome AS abrigo_nome, a.localizacao
+              a.nome AS abrigo_nome, a.localizacao,
+              COALESCE(
+                SUM(m.qtd_casada) FILTER (
+                  WHERE m.status IN ('proposto', 'aceito', 'em_entrega')
+                ), 0
+              )::int AS qtd_em_entrega
        FROM necessidade n
        JOIN tipo_recurso t ON t.id = n.tipo_recurso_id
        JOIN abrigo a ON a.id = n.abrigo_id
+       LEFT JOIN match_doacao m ON m.necessidade_id = n.id
        ${whereSQL}
+       GROUP BY n.id, t.nome, t.categoria, t.unidade_medida, a.nome, a.localizacao
        ORDER BY n.prazo, n.calculada_em DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]

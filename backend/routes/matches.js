@@ -132,12 +132,14 @@ router.put('/:id/status', authRequired, async (req, res) => {
       )
 
       // necessidade: atendida (se cobriu) ou parcialmente_atendida
+      // cast explicito do CASE pro enum — sem isso Postgres trata literais como
+      // text e quebra com "coluna eh status_necessidade mas expressao eh text"
       await client.query(
         `UPDATE necessidade
-         SET status = CASE
+         SET status = (CASE
            WHEN qtd_necessaria <= $2 THEN 'atendida'
            ELSE 'parcialmente_atendida'
-         END
+         END)::status_necessidade
          WHERE id = $1`,
         [match.necessidade_id, match.qtd_casada]
       )
@@ -153,10 +155,12 @@ router.put('/:id/status', authRequired, async (req, res) => {
     }
 
     // atualiza o status do match (e timestamp se for 'recebido')
+    // cast explicito ::status_match — sem isso, $1 vira ambiguo entre enum
+    // e text na mesma query (uso 1: SET status; uso 2: comparacao com texto)
     const { rows: updatedRows } = await client.query(
       `UPDATE match_doacao
-       SET status = $1,
-           confirmado_em = CASE WHEN $1 = 'recebido' THEN NOW() ELSE confirmado_em END
+       SET status = $1::status_match,
+           confirmado_em = CASE WHEN $1::text = 'recebido' THEN NOW() ELSE confirmado_em END
        WHERE id = $2
        RETURNING *`,
       [value.status, req.params.id]

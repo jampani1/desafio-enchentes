@@ -932,9 +932,10 @@ function TabNecessidades({ abrigoId }) {
   const carregar = useCallback(async () => {
     setIndisponivel(false)
     try {
-      const data = await api.get(`/necessidades?abrigoId=${abrigoId}`)
+      const data = await api.get(`/necessidades?abrigo_id=${abrigoId}`)
+      // GET /necessidades retorna { total, page, limit, items }
       setNecessidades(
-        Array.isArray(data) ? data : data?.necessidades || []
+        Array.isArray(data) ? data : data?.items || data?.necessidades || []
       )
     } catch {
       setIndisponivel(true)
@@ -1017,6 +1018,11 @@ function TabNecessidades({ abrigoId }) {
                       {formatarData(n.prazo)}
                       {dias != null &&
                         ` (${dias >= 0 ? `em ${dias} dia(s)` : "vencido"})`}
+                      {n.qtd_em_entrega > 0 && (
+                        <span className="text-accent ml-1">
+                          · {n.qtd_em_entrega} a caminho
+                        </span>
+                      )}
                     </div>
                   </div>
                   {urgente && (

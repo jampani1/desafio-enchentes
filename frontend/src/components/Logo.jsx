@@ -1,3 +1,6 @@
+// Logo do Reabrigo — duas curvas que se encontram no topo (mãos formando
+// um arco / abrigo), com um coração ao centro. Lê como "comunidade
+// abrigando comunidade".
 export function Logo({ size = 32, className = "" }) {
   return (
     <svg
@@ -12,10 +15,16 @@ export function Logo({ size = 32, className = "" }) {
       className={className}
       aria-hidden="true"
     >
-      <path d="M4 22 L16 8 L28 22" />
-      <path d="M9 22 V18" />
-      <path d="M23 22 V18" />
-      <path d="M16 8 L16 14" opacity="0.4" />
+      {/* Mão/arco esquerdo */}
+      <path d="M4 24 C5 14, 11 8, 16 8" />
+      {/* Mão/arco direito */}
+      <path d="M28 24 C27 14, 21 8, 16 8" />
+      {/* Coração no centro */}
+      <path
+        d="M12 17.5 C12 16, 13.5 15, 14.5 16 L16 17.5 L17.5 16 C18.5 15, 20 16, 20 17.5 C20 19, 16 22, 16 22 C16 22, 12 19, 12 17.5 Z"
+        fill="currentColor"
+        stroke="none"
+      />
     </svg>
   )
 }

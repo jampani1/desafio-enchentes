@@ -25,6 +25,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export function DoadorHome() {
   const { usuario } = useAuth()
@@ -160,12 +177,24 @@ export function DoadorHome() {
         </div>
 
         {/* TABS */}
-        <Tabs defaultValue="minhas">
+        <Tabs defaultValue="necessidades">
           <TabsList>
+            <TabsTrigger value="necessidades">Necessidades abertas</TabsTrigger>
             <TabsTrigger value="minhas">Minhas ofertas</TabsTrigger>
             <TabsTrigger value="abrigos">Abrigos com vagas</TabsTrigger>
             <TabsTrigger value="matches">Meus matches</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="necessidades" className="mt-4">
+            <CardNecessidadesParaDoar
+              minhasOfertas={minhasOfertas || []}
+              nomeRecurso={nomeRecurso}
+              onMatchCriado={async () => {
+                await carregarMinhas()
+                await carregarMatches()
+              }}
+            />
+          </TabsContent>
 
           <TabsContent value="minhas" className="mt-4">
             <Card>
@@ -311,6 +340,230 @@ export function DoadorHome() {
         </Tabs>
       </div>
     </AppShell>
+  )
+}
+
+function CardNecessidadesParaDoar({ minhasOfertas, nomeRecurso, onMatchCriado }) {
+  const [necessidades, setNecessidades] = useState(null)
+  const [erro, setErro] = useState("")
+  const [propondo, setPropondo] = useState(null)
+
+  const carregar = useCallback(async () => {
+    try {
+      const data = await api.unauth.get("/necessidades")
+      const items = Array.isArray(data) ? data : data?.items || []
+      setNecessidades(items)
+      setErro("")
+    } catch (err) {
+      setErro(err.message)
+      setNecessidades([])
+    }
+  }, [])
+
+  useEffect(() => {
+    carregar()
+  }, [carregar])
+
+  // ofertas em status 'ofertada' indexadas por tipo_recurso_id
+  const ofertasAtivasPorTipo = useMemo(() => {
+    const map = {}
+    for (const o of minhasOfertas) {
+      if (o.status === "ofertada") {
+        if (!map[o.tipo_recurso_id]) map[o.tipo_recurso_id] = []
+        map[o.tipo_recurso_id].push(o)
+      }
+    }
+    return map
+  }, [minhasOfertas])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Necessidades abertas</CardTitle>
+        <CardDescription>
+          Quem precisa do que, agora. Você pode propor uma doação se já tem
+          oferta deste recurso.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {erro ? (
+          <Alert variant="destructive">
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{erro}</AlertDescription>
+          </Alert>
+        ) : necessidades === null ? (
+          <Skeleton className="h-32 w-full" />
+        ) : necessidades.length === 0 ? (
+          <EmptyState
+            titulo="Nenhuma necessidade aberta"
+            descricao="Quando coordenadores recalcularem, as necessidades aparecem aqui."
+          />
+        ) : (
+          <ul className="divide-y">
+            {necessidades.map((n) => {
+              const ofertasCompativeis =
+                ofertasAtivasPorTipo[n.tipo_recurso_id] || []
+              const podePropor = ofertasCompativeis.length > 0
+              return (
+                <li key={n.id} className="py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">
+                      {n.tipo_nome || nomeRecurso(n.tipo_recurso_id)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {n.abrigo_nome} · precisa {n.qtd_necessaria}
+                      {n.unidade_medida ? ` ${n.unidade_medida}` : ""} · prazo{" "}
+                      {formatarData(n.prazo)}
+                      {n.qtd_em_entrega > 0 && (
+                        <span className="text-accent ml-1">
+                          · {n.qtd_em_entrega} a caminho
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {podePropor ? (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        setPropondo({
+                          necessidade: n,
+                          ofertas: ofertasCompativeis,
+                        })
+                      }
+                    >
+                      Propor doação
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      sem oferta compatível
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </CardContent>
+
+      <DialogProporMatch
+        propondo={propondo}
+        onClose={() => setPropondo(null)}
+        onCriado={() => {
+          setPropondo(null)
+          carregar()
+          onMatchCriado?.()
+        }}
+      />
+    </Card>
+  )
+}
+
+function DialogProporMatch({ propondo, onClose, onCriado }) {
+  const [ofertaId, setOfertaId] = useState("")
+  const [qtd, setQtd] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState("")
+
+  useEffect(() => {
+    if (propondo) {
+      const padrao = propondo.ofertas[0]
+      setOfertaId(padrao?.id || "")
+      const max = Math.min(
+        padrao?.qtd_ofertada || 0,
+        propondo.necessidade.qtd_necessaria
+      )
+      setQtd(String(max))
+      setErro("")
+    }
+  }, [propondo])
+
+  if (!propondo) return null
+
+  const ofertaSelecionada = propondo.ofertas.find((o) => o.id === ofertaId)
+  const maxQtd = Math.min(
+    ofertaSelecionada?.qtd_ofertada || 0,
+    propondo.necessidade.qtd_necessaria
+  )
+
+  async function handleSalvar(e) {
+    e.preventDefault()
+    setErro("")
+    setSalvando(true)
+    try {
+      await api.post("/matches", {
+        oferta_id: ofertaId,
+        necessidade_id: propondo.necessidade.id,
+        qtd_casada: Number(qtd),
+      })
+      toast.success("Doação proposta! Aguarde o coordenador aceitar.")
+      onCriado?.()
+    } catch (err) {
+      setErro(err.message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Dialog open={!!propondo} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Propor doação</DialogTitle>
+          <DialogDescription>
+            Para {propondo.necessidade.abrigo_nome} ·{" "}
+            {propondo.necessidade.tipo_nome ||
+              `recurso #${propondo.necessidade.tipo_recurso_id}`}{" "}
+            · precisa {propondo.necessidade.qtd_necessaria}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSalvar} className="space-y-4">
+          {propondo.ofertas.length > 1 && (
+            <div className="space-y-2">
+              <Label>Qual das suas ofertas usar?</Label>
+              <Select value={ofertaId} onValueChange={setOfertaId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {propondo.ofertas.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.qtd_ofertada} unidades · entrega{" "}
+                      {formatarData(o.data_entrega)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="qtd-match">
+              Quantidade a doar (máximo {maxQtd})
+            </Label>
+            <Input
+              id="qtd-match"
+              type="number"
+              min={1}
+              max={maxQtd}
+              required
+              value={qtd}
+              onChange={(e) => setQtd(e.target.value)}
+            />
+          </div>
+          {erro && <p className="text-sm text-destructive">{erro}</p>}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={!ofertaId || !qtd || salvando}
+            >
+              {salvando ? "Propondo..." : "Propor doação"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

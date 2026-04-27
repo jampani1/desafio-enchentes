@@ -14,7 +14,7 @@ export function PublicShell({ children, hideCtas = false }) {
           <Link to="/" className="flex items-center gap-2 text-primary">
             <Logo size={28} />
             <span className="font-semibold text-lg tracking-tight text-foreground">
-              &lt;&lt;NOME&gt;&gt;
+              Reabrigo
             </span>
           </Link>
 
@@ -43,8 +43,22 @@ export function PublicShell({ children, hideCtas = false }) {
 
       <main className="flex-1">{children}</main>
 
-      <footer className="border-t py-4 text-center text-xs text-muted-foreground">
-        &lt;&lt;NOME&gt;&gt; · plataforma de apoio a abrigos em enchentes
+      <footer className="border-t py-6 text-center text-xs text-muted-foreground space-y-1">
+        <div>
+          <span className="font-medium text-foreground">Reabrigo</span> · apoio
+          coordenado a abrigos em enchentes
+        </div>
+        <div>
+          Projeto educacional ·{" "}
+          <a
+            href="https://github.com/jampani1/desafio-enchentes"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            github.com/jampani1
+          </a>
+        </div>
       </footer>
     </div>
   )

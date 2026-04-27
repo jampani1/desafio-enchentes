@@ -129,9 +129,10 @@ export function CoordenadorDashboard() {
 
     // necessidades — endpoint listagem ainda não existe; tentamos rota provável
     try {
-      const data = await api.get(`/necessidades?abrigoId=${idAbrigo}`)
+      const data = await api.get(`/necessidades?abrigo_id=${idAbrigo}`)
+      // GET /necessidades retorna { total, page, limit, items }
       setNecessidades(
-        Array.isArray(data) ? data : data?.necessidades || []
+        Array.isArray(data) ? data : data?.items || data?.necessidades || []
       )
     } catch {
       setNecessidadesIndisponivel(true)
@@ -171,6 +172,10 @@ export function CoordenadorDashboard() {
       ),
     [matches]
   )
+  const matchesPropostos = useMemo(
+    () => (matches || []).filter((m) => m.status === "proposto"),
+    [matches]
+  )
   const necessidadesUrgentes = useMemo(
     () =>
       necessidadesAbertas.filter((n) => {
@@ -198,6 +203,28 @@ export function CoordenadorDashboard() {
       toast.error(err.message || "Não foi possível recalcular.")
     } finally {
       setRecalcLoading(false)
+    }
+  }
+
+  // recalculo automatico — disparado apos confirmar recebimento de uma doacao.
+  // Diferente do handleRecalcular, este nao abre dialog nem mostra spinner —
+  // eh side-effect de "marcou recebido", entao roda silencioso e mostra toast.
+  async function recalcularAposRecebimento() {
+    if (!abrigoAtivoId) return
+    try {
+      const data = await api.post(
+        `/necessidades/calcular/${abrigoAtivoId}`,
+        {}
+      )
+      setNecessidades(data?.necessidades || [])
+      setNecessidadesIndisponivel(false)
+      toast.success(
+        `Estoque atualizado · ${data?.total ?? 0} necessidade(s) restante(s).`
+      )
+    } catch {
+      toast.message(
+        "Estoque atualizado, mas não foi possível recalcular automaticamente. Clique em Recalcular pra atualizar a lista."
+      )
     }
   }
 
@@ -376,6 +403,21 @@ export function CoordenadorDashboard() {
 
           {/* COLUNA DIREITA */}
           <div className="lg:col-span-2 space-y-4">
+            {matchesPropostos.length > 0 && (
+              <CardMatchesPropostos
+                matches={matchesPropostos}
+                nomeRecurso={nomeRecurso}
+                onAtualizado={async () => {
+                  try {
+                    const data = await api.get("/matches/minhas")
+                    setMatches(Array.isArray(data) ? data : [])
+                  } catch {
+                    // mantem estado anterior
+                  }
+                }}
+              />
+            )}
+
             <CardAlertas
               urgentes={necessidadesUrgentes}
               casos={casos || []}
@@ -395,6 +437,7 @@ export function CoordenadorDashboard() {
                   // mantém estado anterior
                 }
               }}
+              onRecebido={recalcularAposRecebimento}
             />
 
             <Card>
@@ -551,6 +594,11 @@ function CardNecessidades({
                       Precisa de {n.qtd_necessaria}
                       {t?.unidade_medida ? ` ${t.unidade_medida}` : ""} · prazo{" "}
                       {formatarData(n.prazo)}
+                      {n.qtd_em_entrega > 0 && (
+                        <span className="text-accent ml-1">
+                          · {n.qtd_em_entrega} a caminho
+                        </span>
+                      )}
                     </div>
                   </div>
                   <StatusBadge tipo="necessidade" status={n.status} />
@@ -697,7 +745,89 @@ function AlertaItem({ tom, titulo, texto }) {
   )
 }
 
-function CardOfertasChegando({ matches, indisponivel, onAtualizado, nomeRecurso }) {
+function CardMatchesPropostos({ matches, nomeRecurso, onAtualizado }) {
+  const [updatingId, setUpdatingId] = useState(null)
+
+  async function decidir(id, status) {
+    setUpdatingId(id)
+    try {
+      await api.put(`/matches/${id}/status`, { status })
+      toast.success(
+        status === "aceito"
+          ? "Match aceito — doador foi notificado."
+          : "Match recusado — oferta volta pro pool."
+      )
+      await onAtualizado?.()
+    } catch (err) {
+      toast.error(err.message || "Não foi possível atualizar.")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  return (
+    <Card className="border-primary/40 bg-primary/5">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          Aguardando sua aprovação
+        </CardTitle>
+        <CardDescription>
+          Doadores propuseram doações. Aceite pra liberar a entrega.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-3">
+          {matches.map((m) => (
+            <li key={m.id} className="rounded-md border bg-card p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {m.tipo_nome ||
+                      nomeRecurso?.(m.tipo_recurso_id) ||
+                      `Match #${m.id?.slice?.(0, 6)}`}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {m.qtd_casada} unidade(s)
+                    {m.doador_nome ? ` · de ${m.doador_nome}` : ""}
+                  </div>
+                </div>
+                <StatusBadge tipo="match" status={m.status} />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  disabled={updatingId !== null}
+                  onClick={() => decidir(m.id, "aceito")}
+                >
+                  {updatingId === m.id ? "..." : "Aceitar"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={updatingId !== null}
+                  onClick={() => decidir(m.id, "cancelado")}
+                >
+                  Recusar
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CardOfertasChegando({
+  matches,
+  indisponivel,
+  onAtualizado,
+  onRecebido,
+  nomeRecurso,
+}) {
   const [updatingId, setUpdatingId] = useState(null)
 
   async function marcarRecebido(id) {
@@ -706,6 +836,8 @@ function CardOfertasChegando({ matches, indisponivel, onAtualizado, nomeRecurso 
       await api.put(`/matches/${id}/status`, { status: "recebido" })
       toast.success("Doação registrada como recebida.")
       await onAtualizado?.()
+      // dispara recalcular silencioso pra atualizar lista de necessidades
+      await onRecebido?.()
     } catch (err) {
       toast.error(err.message || "Não foi possível atualizar.")
     } finally {

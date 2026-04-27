@@ -6,11 +6,13 @@ const { authRequired } = require('../middlewares/auth')
 
 const router = express.Router()
 
+// role 'admin' eh DELIBERADAMENTE removida do enum publico de cadastro.
+// Admins so existem via seed direto no banco (db/seed.js) — nao se cadastram via API.
 const cadastroSchema = Joi.object({
   nome: Joi.string().min(2).max(255).required(),
   email: Joi.string().email().required(),
   senha: Joi.string().min(6).required(),
-  role: Joi.string().valid('coordenador', 'doador', 'admin').required(),
+  role: Joi.string().valid('coordenador', 'doador').required(),
   cpf_ou_cnpj: Joi.string().max(20).allow('', null),
   telefone: Joi.string().max(20).allow('', null),
 })
