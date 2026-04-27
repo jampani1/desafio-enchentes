@@ -10,33 +10,93 @@ const calcSchema = Joi.object({
   prazoDias: Joi.number().integer().min(1).max(365).default(7),
 })
 
-/* 
-    criar um wrapper para calcular a necessidade com as validações
-    da a possibilidade de automatizar os calculos sem ninguem
-    precisar "solicitar" via cron job - service reusável
+// schema da query string do GET /
+// // .default() preenche valores quando a query nao manda
+const listarSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  status: Joi.string().valid('calculada', 'aberta', 'parcialmente_atendida', 'atendida', 'expirada'),
+  abrigo_id: Joi.string().uuid(),
+})
 
-    a regra de calculo esta isolada em um service, atual rota eh
-    so um adaptador
+/*
+  POST /calcular/:abrigoId — wrapper http do service
+  GET / — listagem publica paginada (doadores consomem)
+
+  service isolado permite cron job futuro sem precisar de http
 */
 
-//GET /necessidades?page=1&limit=20&status=aberta
+// GET / — listagem paginada de necessidades (publica)
+//   query params: ?page=1&limit=20&status=aberta&abrigo_id=uuid
+//   response: { total, page, limit, items: [...] }
 
-// router.get('/necessidades?page=1&limit=20&status=aberta', async (req, res) => {
-//     Response: 
-//     {
-//         "total":
-//     }
-// }))
+router.get('/', async (req, res) => {
+  // validacao da query string (com defaults aplicados)
+  const { error, value } = listarSchema.validate(req.query)
+  if (error) return res.status(400).json({ erro: error.details[0].message })
 
-//POST /necessidade/calcular/:abrigoId
+  const { page, limit, status, abrigo_id } = value
+  const offset = (page - 1) * limit  // paginacao = pular (page-1)*limit linhas
+
+  // construcao dinamica do WHERE — so adiciona filtros que vieram na query
+  const where = []
+  const params = []
+  if (status) {
+    where.push(`n.status = $${params.length + 1}`)
+    params.push(status)
+  } else {
+    // default: so as que interessam pra doador (em aberto ou parcialmente atendidas)
+    where.push(`n.status IN ('aberta', 'parcialmente_atendida')`)
+  }
+  if (abrigo_id) {
+    where.push(`n.abrigo_id = $${params.length + 1}`)
+    params.push(abrigo_id)
+  }
+  const whereSQL = where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''
+
+  try {
+    //    isso permite frontend mostrar "pagina 3 de 25" sem buscar tudo
+    const countResult = await pool.query(
+      `SELECT COUNT(*) AS total FROM necessidade n ${whereSQL}`,
+      params
+    )
+    const total = parseInt(countResult.rows[0].total)
+
+    //    SELECT paginado — LIMIT pega N linhas, OFFSET pula N anteriores
+    //    JOINs trazem nome do recurso e do abrigo (mais util pro frontend)
+    const itemsResult = await pool.query(
+      `SELECT n.*,
+              t.nome AS tipo_nome, t.categoria, t.unidade_medida,
+              a.nome AS abrigo_nome, a.localizacao
+       FROM necessidade n
+       JOIN tipo_recurso t ON t.id = n.tipo_recurso_id
+       JOIN abrigo a ON a.id = n.abrigo_id
+       ${whereSQL}
+       ORDER BY n.prazo, n.calculada_em DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    )
+
+    res.json({
+      total,
+      page,
+      limit,
+      items: itemsResult.rows,
+    })
+  } catch (err) {
+    res.status(500).json({ erro: err.message })
+  }
+})
+
+// POST /calcular/:abrigoId — dispara o service de calculo
 
 router.post('/calcular/:abrigoId', authRequired, hasRole('coordenador', 'admin'), async (req, res) => {
-  // 1. validar req.body com calcSchema
+  // validar req.body com calcSchema
   const { error, value } = calcSchema.validate(req.body)
     if (error) {
   return res.status(400).json({ erro: error.details[0].message })
 }
-  // 2. checar ownership: se NÃO for admin - query que busca de qual abrigo eh o coordenador que faz a solicitacao
+  // checar ownership: se NÃO for admin - query que busca de qual abrigo eh o coordenador que faz a solicitacao
   if (req.user.role !== 'admin') {
   const { rows } = await pool.query(
     'SELECT coordenador_id FROM abrigo WHERE id = $1',
@@ -54,11 +114,11 @@ router.post('/calcular/:abrigoId', authRequired, hasRole('coordenador', 'admin')
   // 404 antes de 403: primeiro existe; depois pertence
   // se só utilizassemos 403 - evita enumeration attacks - interessante em sistemas de high security
 }
-  // 3. try/catch chamando calcularNecessidades(abrigoId, prazoDias)
+  // try/catch chamando calcularNecessidades(abrigoId, prazoDias)
   try {
     const necessidades = await calcularNecessidades(req.params.abrigoId, value.prazoDias)
     // retornar total (com length) permite frontend usar esse numero sem calcular
-      // 4. retornar 201 com { total: array.length, necessidades: array }
+      // retornar 201 com { total: array.length, necessidades: array }
     res.status(201).json({ total: necessidades.length, necessidades })
     } catch (err) {
         res.status(500).json({ erro: err.message })
