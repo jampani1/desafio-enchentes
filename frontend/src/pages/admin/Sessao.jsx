@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/context/AuthContext"
 import { ROLE } from "@/lib/enums"
+import { obterPreviews, obterTotal } from "@/lib/preview"
 import { AppShell } from "@/components/AppShell"
 import {
   Card,
@@ -11,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export function AdminSessao() {
   const { usuario } = useAuth()
@@ -20,6 +22,10 @@ export function AdminSessao() {
     tipos: null,
   })
   const [tiposIndisponivel, setTiposIndisponivel] = useState(false)
+  const [previews] = useState(obterPreviews)
+  const [previewsTotal] = useState(obterTotal)
+  // contagem global vinda do backend (preview_view table)
+  const [globalPreviews, setGlobalPreviews] = useState(null)
 
   useEffect(() => {
     api
@@ -45,7 +51,18 @@ export function AdminSessao() {
         }
         setStats((s) => ({ ...s, tipos: 0 }))
       })
+    // contagem global de previews — falha silenciosa se rota indisponivel
+    api
+      .unauth.get("/publico/preview-views")
+      .then(setGlobalPreviews)
+      .catch(() => setGlobalPreviews(null))
   }, [])
+
+  // helper: pega contagem global por role, ou 0 se ainda nao carregou
+  const globalCount = (role) => {
+    if (!globalPreviews) return null
+    return globalPreviews.items.find((i) => i.role === role)?.count ?? 0
+  }
 
   return (
     <AppShell>
@@ -109,8 +126,110 @@ export function AdminSessao() {
             indisponivel={tiposIndisponivel}
           />
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Acessos a previews</CardTitle>
+            <CardDescription>
+              Quantas vezes os modos demo foram abertos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Global (todos os navegadores) */}
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                Global (todos os usuários)
+              </div>
+              <div className="grid sm:grid-cols-4 gap-4">
+                <PreviewStat
+                  titulo="Coordenador"
+                  valor={globalCount("coordenador")}
+                  tom="primary"
+                />
+                <PreviewStat
+                  titulo="Doador"
+                  valor={globalCount("doador")}
+                  tom="accent"
+                />
+                <PreviewStat
+                  titulo="Voluntário"
+                  valor={globalCount("voluntario")}
+                  tom="special"
+                />
+                <PreviewStat
+                  titulo="Total"
+                  valor={globalPreviews?.total ?? null}
+                  tom="muted"
+                />
+              </div>
+            </div>
+
+            {/* Local (este navegador) */}
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                Neste navegador
+              </div>
+              <div className="grid sm:grid-cols-4 gap-4">
+                <PreviewStat
+                  titulo="Coordenador"
+                  valor={previews.coordenador}
+                  tom="primary"
+                />
+                <PreviewStat
+                  titulo="Doador"
+                  valor={previews.doador}
+                  tom="accent"
+                />
+                <PreviewStat
+                  titulo="Voluntário"
+                  valor={previews.voluntario}
+                  tom="special"
+                />
+                <PreviewStat
+                  titulo="Total"
+                  valor={previewsTotal}
+                  tom="muted"
+                />
+              </div>
+            </div>
+
+            {globalPreviews === null && (
+              <Alert>
+                <AlertTitle>Contagem global indisponível</AlertTitle>
+                <AlertDescription>
+                  Não consegui ler{" "}
+                  <code className="text-xs">GET /publico/preview-views</code> —
+                  exibindo só os números deste navegador.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
+  )
+}
+
+function PreviewStat({ titulo, valor, tom = "primary" }) {
+  const cores = {
+    primary: "text-primary",
+    accent: "text-accent",
+    special: "text-special",
+    muted: "text-foreground",
+  }
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+        {titulo}
+      </div>
+      <div className={`text-2xl font-semibold tabular-nums ${cores[tom]}`}>
+        {valor === null || valor === undefined ? (
+          <Skeleton className="h-7 w-10 inline-block" />
+        ) : (
+          valor
+        )}
+      </div>
+    </div>
   )
 }
 

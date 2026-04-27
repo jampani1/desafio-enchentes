@@ -7,8 +7,13 @@ const pool = require('./db')
 
 const PORT = process.env.PORT || 3000
 
-// Middlewares globais
-app.use(cors())
+// CORS: em producao restringir aos dominios do frontend (separados por virgula
+// em FRONTEND_URL); em dev, sem FRONTEND_URL setado, libera todas origens.
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()).filter(Boolean)
+  : true // dev: permissivo
+
+app.use(cors({ origin: allowedOrigins }))
 app.use(express.json())
 
 // Health checks

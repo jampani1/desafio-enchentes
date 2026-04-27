@@ -9,6 +9,7 @@ SET client_encoding = 'UTF8';
 -- DROPS (re-rodar limpa tudo)
 -- ============================================================
 
+DROP TABLE IF EXISTS preview_view CASCADE;
 DROP TABLE IF EXISTS historico_log CASCADE;
 DROP TABLE IF EXISTS match_doacao CASCADE;
 DROP TABLE IF EXISTS oferta CASCADE;
@@ -186,6 +187,14 @@ CREATE TABLE historico_log (
   usuario_id UUID REFERENCES usuario(id),
   payload JSONB,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Tracking publico de visitas a previews (modo demo, sem login)
+-- Contador agregado por role; sem dado pessoal.
+CREATE TABLE preview_view (
+  role VARCHAR(20) PRIMARY KEY,
+  count INT NOT NULL DEFAULT 0,
+  ultimo_acesso TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================
