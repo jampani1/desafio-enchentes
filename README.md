@@ -6,7 +6,6 @@ Plataforma que conecta abrigos a doadores em situações de enchente, calculando
 
 - 🌐 Frontend em produção: <https://desafio-enchentes-frontend.onrender.com>
 - 🔌 API em produção: <https://desafio-enchentes.onrender.com>
-- 👤 Autor: [Maurício Jampani](https://github.com/jampani1)
 
 ---
 
