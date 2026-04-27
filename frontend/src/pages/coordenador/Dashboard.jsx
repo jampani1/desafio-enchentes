@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { toast } from "sonner"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/context/AuthContext"
+import { useCatalogo } from "@/context/CatalogoContext"
 import {
   CATEGORIA_VITIMA,
   CONDICAO_ESPECIAL,
@@ -44,6 +45,7 @@ const STATUS_INDICANDO_CHEGADA = ["aceito", "em_entrega"]
 
 export function CoordenadorDashboard() {
   const { usuario } = useAuth()
+  const { nomeRecurso, detalheRecurso } = useCatalogo()
 
   const [abrigos, setAbrigos] = useState(null)
   const [erroAbrigos, setErroAbrigos] = useState("")
@@ -360,6 +362,8 @@ export function CoordenadorDashboard() {
               necessidades={necessidadesAbertas}
               abrigoId={abrigoAtivoId}
               onRecalcular={() => setRecalcOpen(true)}
+              nomeRecurso={nomeRecurso}
+              detalheRecurso={detalheRecurso}
             />
 
             <CardComposicaoDemografica
@@ -376,11 +380,13 @@ export function CoordenadorDashboard() {
               urgentes={necessidadesUrgentes}
               casos={casos || []}
               casosIndisponivel={casosIndisponivel}
+              nomeRecurso={nomeRecurso}
             />
 
             <CardOfertasChegando
               indisponivel={matchesIndisponivel}
               matches={matchesChegando}
+              nomeRecurso={nomeRecurso}
               onAtualizado={async () => {
                 try {
                   const data = await api.get("/matches/minhas")
@@ -489,7 +495,14 @@ function KpiCard({ titulo, valor, sub, tom = "primary", indisponivel, children }
   )
 }
 
-function CardNecessidades({ necessidades, indisponivel, abrigoId, onRecalcular }) {
+function CardNecessidades({
+  necessidades,
+  indisponivel,
+  abrigoId,
+  onRecalcular,
+  nomeRecurso,
+  detalheRecurso,
+}) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -524,20 +537,26 @@ function CardNecessidades({ necessidades, indisponivel, abrigoId, onRecalcular }
           />
         ) : (
           <ul className="divide-y">
-            {necessidades.slice(0, 8).map((n) => (
-              <li key={n.id} className="py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">
-                    {n.tipo_nome || `Recurso #${n.tipo_recurso_id}`}
+            {necessidades.slice(0, 8).map((n) => {
+              const t = detalheRecurso?.(n.tipo_recurso_id)
+              return (
+                <li key={n.id} className="py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">
+                      {n.tipo_nome ||
+                        nomeRecurso?.(n.tipo_recurso_id) ||
+                        `Recurso #${n.tipo_recurso_id}`}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Precisa de {n.qtd_necessaria}
+                      {t?.unidade_medida ? ` ${t.unidade_medida}` : ""} · prazo{" "}
+                      {formatarData(n.prazo)}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Precisa de {n.qtd_necessaria} · prazo{" "}
-                    {formatarData(n.prazo)}
-                  </div>
-                </div>
-                <StatusBadge tipo="necessidade" status={n.status} />
-              </li>
-            ))}
+                  <StatusBadge tipo="necessidade" status={n.status} />
+                </li>
+              )
+            })}
             {necessidades.length > 8 && (
               <li className="py-3 text-center">
                 <Button asChild variant="ghost" size="sm">
@@ -611,13 +630,17 @@ function CardComposicaoDemografica({ pessoas, total, indisponivel, abrigoId }) {
   )
 }
 
-function CardAlertas({ urgentes, casos, casosIndisponivel }) {
+function CardAlertas({ urgentes, casos, casosIndisponivel, nomeRecurso }) {
   const itens = []
 
   urgentes.forEach((n) => {
+    const nome =
+      n.tipo_nome ||
+      nomeRecurso?.(n.tipo_recurso_id) ||
+      `Recurso #${n.tipo_recurso_id}`
     itens.push({
       tom: "destructive",
-      titulo: `Prazo apertado: ${n.tipo_nome || `recurso #${n.tipo_recurso_id}`}`,
+      titulo: `Prazo apertado: ${nome}`,
       texto: `Faltam ${n.qtd_necessaria} unidade(s) até ${formatarData(n.prazo)}.`,
     })
   })
@@ -674,7 +697,7 @@ function AlertaItem({ tom, titulo, texto }) {
   )
 }
 
-function CardOfertasChegando({ matches, indisponivel, onAtualizado }) {
+function CardOfertasChegando({ matches, indisponivel, onAtualizado, nomeRecurso }) {
   const [updatingId, setUpdatingId] = useState(null)
 
   async function marcarRecebido(id) {
@@ -720,7 +743,9 @@ function CardOfertasChegando({ matches, indisponivel, onAtualizado }) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {m.tipo_nome || `Recurso #${m.oferta_id?.slice?.(0, 6)}`}
+                      {m.tipo_nome ||
+                        nomeRecurso?.(m.tipo_recurso_id) ||
+                        `Match #${m.id?.slice?.(0, 6)}`}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {m.qtd_casada} unidade(s)

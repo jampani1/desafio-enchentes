@@ -2,13 +2,17 @@ import { useCallback, useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { api, ApiError } from "@/lib/api"
+import { useCatalogo } from "@/context/CatalogoContext"
 import {
   CATEGORIA_VITIMA,
-  CATEGORIA_VITIMA_OPTIONS,
   CONDICAO_ESPECIAL,
   CONDICAO_ESPECIAL_OPTIONS,
   CATEGORIA_RECURSO,
 } from "@/lib/enums"
+import {
+  GRUPOS_FAIXA_ETARIA,
+  GRUPO_POR_CATEGORIA,
+} from "@/lib/faixaEtaria"
 import {
   formatarData,
   formatarRelativo,
@@ -372,47 +376,82 @@ function DialogPessoa({
     }
   }
 
-  const opcoes = CATEGORIA_VITIMA_OPTIONS.filter(
-    (o) =>
-      !editando &&
-      categoriasUsadas.includes(o.value)
-        ? false
-        : true
-  )
+  const tomClasses = {
+    warn: "border-warn/40 bg-warn/15 text-warn-foreground hover:bg-warn/25",
+    primary: "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15",
+    accent: "border-accent/40 bg-accent/15 text-accent hover:bg-accent/20",
+    special: "border-special/40 bg-special/10 text-special hover:bg-special/20",
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl max-h-[90svh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {editando ? "Editar quantidade" : "Adicionar categoria"}
+            {editando ? "Atualizar quantidade" : "Adicionar pessoas abrigadas"}
           </DialogTitle>
           <DialogDescription>
-            Cadastro agregado, sem identificação individual.
+            Selecione a faixa etária e perfil. O cálculo de consumo (água,
+            fraldas, alimentos) varia por idade e gênero — por isso pedimos
+            esse detalhe. Sem nome, sem documento.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSalvar} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Categoria</Label>
-            <Select
-              value={categoria}
-              onValueChange={setCategoria}
-              disabled={!!editando}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {opcoes.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <form onSubmit={handleSalvar} className="space-y-5">
+          <div className="space-y-3">
+            <Label>Faixa etária e perfil</Label>
+            <div className="space-y-3">
+              {GRUPOS_FAIXA_ETARIA.map((g) => (
+                <div key={g.id}>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {g.label}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {g.descricao}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {g.categorias.map((c) => {
+                      const ativo = categoria === c.value
+                      const usada =
+                        !editando && categoriasUsadas.includes(c.value)
+                      return (
+                        <button
+                          type="button"
+                          key={c.value}
+                          disabled={
+                            usada || (!!editando && editando.categoria !== c.value)
+                          }
+                          onClick={() => setCategoria(c.value)}
+                          className={`text-left rounded-md border p-3 transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                            ativo
+                              ? tomClasses[g.tom] +
+                                " ring-2 ring-offset-1 ring-current"
+                              : "border-border hover:bg-muted"
+                          }`}
+                        >
+                          <div className="text-sm font-medium">
+                            {c.label}
+                          </div>
+                          <div className="text-xs opacity-80">
+                            {c.subtitulo}
+                          </div>
+                          {usada && (
+                            <div className="text-[10px] mt-1 uppercase opacity-70">
+                              já cadastrada
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="qtd">Quantidade</Label>
+            <Label htmlFor="qtd">Quantas pessoas dessa faixa estão abrigadas?</Label>
             <Input
               id="qtd"
               type="number"
@@ -420,8 +459,10 @@ function DialogPessoa({
               required
               value={qtd}
               onChange={(e) => setQtd(e.target.value)}
+              placeholder="Ex.: 12"
             />
           </div>
+
           {erro && (
             <p className="text-sm text-destructive" role="alert">
               {erro}
@@ -435,7 +476,7 @@ function DialogPessoa({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={!categoria || salvando}>
+            <Button type="submit" disabled={!categoria || !qtd || salvando}>
               {salvando ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>
@@ -647,10 +688,10 @@ function DialogCaso({ open, onOpenChange, abrigoId, onSalvo }) {
  * ==================================================================== */
 
 function TabEstoque({ abrigoId }) {
+  const { tipos, erro: tiposErro, nomeRecurso } = useCatalogo()
+  const tiposIndisponivel = !!tiposErro
   const [estoque, setEstoque] = useState(null)
-  const [tipos, setTipos] = useState(null)
   const [estoqueIndisponivel, setEstoqueIndisponivel] = useState(false)
-  const [tiposIndisponivel, setTiposIndisponivel] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const carregarEstoque = useCallback(async () => {
@@ -671,18 +712,6 @@ function TabEstoque({ abrigoId }) {
   useEffect(() => {
     carregarEstoque()
   }, [carregarEstoque])
-
-  useEffect(() => {
-    api
-      .unauth.get("/tipos-recurso")
-      .then((data) => setTipos(Array.isArray(data) ? data : []))
-      .catch((err) => {
-        if (err instanceof ApiError && err.status >= 500) {
-          setTiposIndisponivel(true)
-        }
-        setTipos([])
-      })
-  }, [])
 
   return (
     <Card>
@@ -743,9 +772,7 @@ function TabEstoque({ abrigoId }) {
                 {estoque.map((e) => (
                   <TableRow key={`${e.tipo_recurso_id}`}>
                     <TableCell className="font-medium">
-                      {e.tipo_nome ||
-                        tipos?.find((t) => t.id === e.tipo_recurso_id)?.nome ||
-                        `#${e.tipo_recurso_id}`}
+                      {e.tipo_nome || nomeRecurso(e.tipo_recurso_id)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {CATEGORIA_RECURSO[e.categoria] || e.categoria || "-"}
@@ -897,6 +924,7 @@ function DialogEstoque({
  * ==================================================================== */
 
 function TabNecessidades({ abrigoId }) {
+  const { nomeRecurso, detalheRecurso } = useCatalogo()
   const [necessidades, setNecessidades] = useState(null)
   const [indisponivel, setIndisponivel] = useState(false)
   const [recalculando, setRecalculando] = useState(false)
@@ -974,14 +1002,18 @@ function TabNecessidades({ abrigoId }) {
             {necessidades.map((n) => {
               const dias = diasAteHoje(n.prazo)
               const urgente = dias != null && dias <= 3
+              const t = detalheRecurso(n.tipo_recurso_id)
+              const nome =
+                n.tipo_nome || nomeRecurso(n.tipo_recurso_id)
               return (
                 <li key={n.id} className="py-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">
-                      {n.tipo_nome || `Recurso #${n.tipo_recurso_id}`}
+                      {nome}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Quantidade necessária: {n.qtd_necessaria} · prazo{" "}
+                      Quantidade necessária: {n.qtd_necessaria}
+                      {t?.unidade_medida ? ` ${t.unidade_medida}` : ""} · prazo{" "}
                       {formatarData(n.prazo)}
                       {dias != null &&
                         ` (${dias >= 0 ? `em ${dias} dia(s)` : "vencido"})`}

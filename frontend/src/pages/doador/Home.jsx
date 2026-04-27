@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { toast } from "sonner"
 import { api, ApiError } from "@/lib/api"
 import { useAuth } from "@/context/AuthContext"
+import { useCatalogo } from "@/context/CatalogoContext"
 import { formatarData, formatarRelativo } from "@/lib/formatters"
 import { AppShell } from "@/components/AppShell"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -27,6 +28,7 @@ import { Progress } from "@/components/ui/progress"
 
 export function DoadorHome() {
   const { usuario } = useAuth()
+  const { nomeRecurso } = useCatalogo()
 
   const [abrigosPub, setAbrigosPub] = useState(null)
   const [erroAbrigos, setErroAbrigos] = useState("")
@@ -200,7 +202,7 @@ export function DoadorHome() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm">
-                            {o.tipo_nome || `Recurso #${o.tipo_recurso_id}`}
+                            {o.tipo_nome || nomeRecurso(o.tipo_recurso_id)}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {o.qtd_ofertada}{" "}
@@ -297,6 +299,7 @@ export function DoadorHome() {
                       <ItemMatch
                         key={m.id}
                         match={m}
+                        nomeRecurso={nomeRecurso}
                         onAtualizar={carregarMatches}
                       />
                     ))}
@@ -311,7 +314,7 @@ export function DoadorHome() {
   )
 }
 
-function ItemMatch({ match, onAtualizar }) {
+function ItemMatch({ match, onAtualizar, nomeRecurso }) {
   const [updatingTo, setUpdatingTo] = useState(null)
 
   async function mudarStatus(novo) {
@@ -337,7 +340,9 @@ function ItemMatch({ match, onAtualizar }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-medium">
-            {match.tipo_nome || `Match #${match.id?.slice?.(0, 6)}`}
+            {match.tipo_nome ||
+              nomeRecurso?.(match.tipo_recurso_id) ||
+              `Match #${match.id?.slice?.(0, 6)}`}
           </div>
           <div className="text-xs text-muted-foreground">
             {match.qtd_casada} unidade(s) ·{" "}

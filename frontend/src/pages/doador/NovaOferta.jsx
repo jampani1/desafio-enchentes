@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { api, ApiError } from "@/lib/api"
+import { api } from "@/lib/api"
+import { useCatalogo } from "@/context/CatalogoContext"
 import { CATEGORIA_RECURSO } from "@/lib/enums"
 import { AppShell } from "@/components/AppShell"
 import { Button } from "@/components/ui/button"
@@ -30,8 +31,8 @@ export function NovaOferta() {
   const navigate = useNavigate()
   const hoje = format(new Date(), "yyyy-MM-dd")
 
-  const [tipos, setTipos] = useState(null)
-  const [tiposIndisponivel, setTiposIndisponivel] = useState(false)
+  const { tipos, carregando: tiposCarregando, erro: tiposErro } = useCatalogo()
+  const tiposIndisponivel = !!tiposErro
   const [form, setForm] = useState({
     tipo_recurso_id: "",
     qtd_ofertada: "",
@@ -39,18 +40,6 @@ export function NovaOferta() {
   })
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState("")
-
-  useEffect(() => {
-    api
-      .unauth.get("/tipos-recurso")
-      .then((data) => setTipos(Array.isArray(data) ? data : []))
-      .catch((err) => {
-        if (err instanceof ApiError && err.status >= 500) {
-          setTiposIndisponivel(true)
-        }
-        setTipos([])
-      })
-  }, [])
 
   function up(campo, valor) {
     setForm((f) => ({ ...f, [campo]: valor }))
@@ -112,7 +101,7 @@ export function NovaOferta() {
             </CardContent>
           )}
 
-          {tipos === null ? (
+          {tiposCarregando ? (
             <CardContent className="space-y-4">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
