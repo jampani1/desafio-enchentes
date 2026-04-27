@@ -1,0 +1,46 @@
+# Dependencias e build
+node_modules/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Variaveis de ambiente (NUNCA commitar — credenciais!)
+.env
+.env.local
+.env.*.local
+.dev-creds
+*.creds
+
+# Notas pessoais (anotacoes do Mauricio, nao vao pro repositorio)
+notas.txt
+notas.md
+notas_*.txt
+notas_*.md
+NOTAS.md
+notes.txt
+notes.md
+_pessoal/
+_local/
+TODO_local.md
+SCRATCH.md
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups e temporarios
+*.bak
+*.tmp
+*~
+
+CLAUDE.md
+DESIGN.md
