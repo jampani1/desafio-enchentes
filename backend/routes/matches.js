@@ -15,12 +15,8 @@ const statusSchema = Joi.object({
   status: Joi.string().valid('aceito', 'em_entrega', 'recebido', 'cancelado').required(),
 })
 
-// ============================================================
 // POST / — propor match (oferta + necessidade)
-// Usa TRANSACAO porque trava a oferta com FOR UPDATE pra
-// evitar 2 doadores pegarem a mesma simultaneamente
-// (race condition).
-// ============================================================
+// TRANSACAO para travar a oferta com FOR UPDATE; (race condition).
 
 router.post('/', authRequired, async (req, res) => {
   const { error, value } = matchSchema.validate(req.body)
@@ -30,7 +26,7 @@ router.post('/', authRequired, async (req, res) => {
   try {
     await client.query('BEGIN')
 
-    // 1. trava a oferta — outras transacoes esperam ate COMMIT/ROLLBACK
+    // trava a oferta — outras transacoes esperam ate COMMIT/ROLLBACK
     const { rows: ofertaRows } = await client.query(
       'SELECT * FROM oferta WHERE id = $1 FOR UPDATE',
       [value.oferta_id]
@@ -83,7 +79,6 @@ router.post('/', authRequired, async (req, res) => {
   }
 })
 
-// ============================================================
 // PUT /:id/status — atualiza status do match
 // Side effects:
 //   status='recebido'   → estoque += qtd_casada,
@@ -91,7 +86,6 @@ router.post('/', authRequired, async (req, res) => {
 //                         necessidade vira 'atendida' ou 'parcialmente_atendida'
 //   status='cancelado'  → oferta volta pra 'ofertada' (libera pra outros)
 //   status='aceito' / 'em_entrega' → so atualiza o match, sem cascata
-// ============================================================
 
 router.put('/:id/status', authRequired, async (req, res) => {
   const { error, value } = statusSchema.validate(req.body)
@@ -101,7 +95,7 @@ router.put('/:id/status', authRequired, async (req, res) => {
   try {
     await client.query('BEGIN')
 
-    // 1. busca o match com tudo que precisa (JOIN + FOR UPDATE)
+    // busca o match com tudo que precisa (JOIN + FOR UPDATE)
     const { rows: matchRows } = await client.query(
       `SELECT m.*,
               o.tipo_recurso_id, o.qtd_ofertada, o.doador_id,
@@ -119,9 +113,9 @@ router.put('/:id/status', authRequired, async (req, res) => {
     }
     const match = matchRows[0]
 
-    // 2. side effects do 'recebido'
+    // side effects do 'recebido'
     if (value.status === 'recebido') {
-      // 2a. soma qtd_casada no estoque do abrigo (UPSERT)
+      // soma qtd_casada no estoque do abrigo (UPSERT)
       await client.query(
         `INSERT INTO estoque (abrigo_id, tipo_recurso_id, quantidade_atual)
          VALUES ($1, $2, $3)
@@ -131,13 +125,13 @@ router.put('/:id/status', authRequired, async (req, res) => {
         [match.abrigo_id, match.tipo_recurso_id, match.qtd_casada]
       )
 
-      // 2b. marca oferta como entregue
+      // marca oferta como entregue
       await client.query(
         "UPDATE oferta SET status = 'entregue' WHERE id = $1",
         [match.oferta_id]
       )
 
-      // 2c. necessidade: atendida (se cobriu) ou parcialmente_atendida
+      // necessidade: atendida (se cobriu) ou parcialmente_atendida
       await client.query(
         `UPDATE necessidade
          SET status = CASE
@@ -149,7 +143,7 @@ router.put('/:id/status', authRequired, async (req, res) => {
       )
     }
 
-    // 3. side effects do 'cancelado'
+    // side effects do 'cancelado'
     if (value.status === 'cancelado') {
       // libera a oferta pra outros doadores tentarem
       await client.query(
@@ -158,7 +152,7 @@ router.put('/:id/status', authRequired, async (req, res) => {
       )
     }
 
-    // 4. atualiza o status do match (e timestamp se for 'recebido')
+    // atualiza o status do match (e timestamp se for 'recebido')
     const { rows: updatedRows } = await client.query(
       `UPDATE match_doacao
        SET status = $1,
