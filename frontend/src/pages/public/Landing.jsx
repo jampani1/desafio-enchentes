@@ -23,7 +23,7 @@ export function Landing() {
   return (
     <PublicShell>
       {/* HERO */}
-      <section className="bg-gradient-to-b from-primary/8 to-background border-b">
+      <section className="bg-linear-to-b from-primary/8 to-background border-b">
         <div className="max-w-6xl mx-auto px-4 py-16 md:py-24 grid md:grid-cols-2 gap-10 items-center">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
@@ -103,6 +103,51 @@ export function Landing() {
         </div>
       </section>
 
+      {/* EXPERIMENTE SEM CADASTRAR */}
+      <section className="border-y bg-primary/5">
+        <div className="max-w-6xl mx-auto px-4 py-16 space-y-8">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              Experimente sem cadastrar
+            </div>
+            <h2 className="text-2xl font-semibold">
+              Veja como cada papel funciona, com dados de exemplo.
+            </h2>
+            <p className="text-muted-foreground">
+              Entre em modo demo e navegue na visão de quem coordena, de quem
+              doa ou de quem se voluntaria. Você decide se cadastra de verdade
+              depois.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <DemoOpcao
+              titulo="Como coordenador"
+              descricao="Você gerencia um abrigo: vê pessoas, estoque, necessidades calculadas e doações chegando."
+              cta="Entrar como coordenador"
+              to="/preview/coordenador"
+              tom="primary"
+            />
+            <DemoOpcao
+              titulo="Como doador"
+              descricao="Sua empresa (atacado, farmácia, ONG) doa o que faz sentido pro seu negócio. Doação direcionada."
+              cta="Entrar como doador"
+              to="/preview/doador"
+              tom="accent"
+            />
+            <DemoOpcao
+              titulo="Como voluntário"
+              descricao="Você é enfermeiro, motorista, cozinheiro? Veja chamadas perto de você. (Em breve no app real.)"
+              cta="Entrar como voluntário"
+              to="/preview/voluntario"
+              tom="special"
+              novo
+            />
+          </div>
+        </div>
+      </section>
+
       {/* ABRIGOS COM VAGAS */}
       <section className="bg-muted/40 border-t">
         <div className="max-w-6xl mx-auto px-4 py-16">
@@ -179,5 +224,37 @@ export function Landing() {
         </div>
       </section>
     </PublicShell>
+  )
+}
+
+function DemoOpcao({ titulo, descricao, cta, to, tom = "primary", novo }) {
+  const tomClasses = {
+    primary: "border-primary/40 hover:border-primary",
+    accent: "border-accent/40 hover:border-accent",
+    special: "border-special/40 hover:border-special",
+  }
+  const dotClasses = {
+    primary: "bg-primary",
+    accent: "bg-accent",
+    special: "bg-special",
+  }
+  return (
+    <Card className={`transition-colors ${tomClasses[tom]}`}>
+      <CardContent className="pt-6 pb-6 space-y-3 flex flex-col h-full">
+        <div className="flex items-center justify-between">
+          <span className={`h-2 w-2 rounded-full ${dotClasses[tom]}`} />
+          {novo && (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-special">
+              em breve
+            </span>
+          )}
+        </div>
+        <h3 className="font-semibold">{titulo}</h3>
+        <p className="text-sm text-muted-foreground flex-1">{descricao}</p>
+        <Button asChild variant="outline" className="w-full">
+          <Link to={to}>{cta}</Link>
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

@@ -117,6 +117,7 @@ const MATCHES = [
 
 export function CoordenadorDemo() {
   const [necessidades] = useState(necessidadesMock)
+  const [agora] = useState(() => Date.now())
   const totalPessoas = PESSOAS.reduce((acc, p) => acc + p.qtd, 0)
 
   useEffect(() => {
@@ -129,12 +130,13 @@ export function CoordenadorDemo() {
     })
   }
 
-  const urgentes = necessidades.filter((n) => {
-    const dias = Math.ceil(
-      (new Date(n.prazo).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  function diasAte(prazo) {
+    return Math.ceil(
+      (new Date(prazo).getTime() - agora) / (1000 * 60 * 60 * 24)
     )
-    return dias <= 3
-  })
+  }
+
+  const urgentes = necessidades.filter((n) => diasAte(n.prazo) <= 3)
 
   return (
     <PreviewShell role="coordenador" usuarioFake={USUARIO_FAKE}>
@@ -219,10 +221,7 @@ export function CoordenadorDemo() {
               <CardContent>
                 <ul className="divide-y">
                   {necessidades.map((n) => {
-                    const dias = Math.ceil(
-                      (new Date(n.prazo).getTime() - Date.now()) /
-                        (1000 * 60 * 60 * 24)
-                    )
+                    const dias = diasAte(n.prazo)
                     return (
                       <li
                         key={n.id}

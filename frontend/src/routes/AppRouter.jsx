@@ -9,6 +9,9 @@ import { AbrigoGestao } from "@/pages/coordenador/AbrigoGestao"
 import { DoadorHome } from "@/pages/doador/Home"
 import { NovaOferta } from "@/pages/doador/NovaOferta"
 import { AdminSessao } from "@/pages/admin/Sessao"
+import { CoordenadorDemo } from "@/pages/preview/CoordenadorDemo"
+import { DoadorDemo } from "@/pages/preview/DoadorDemo"
+import { VoluntarioDemo } from "@/pages/preview/VoluntarioDemo"
 
 export function AppRouter() {
   return (
@@ -16,6 +19,10 @@ export function AppRouter() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/cadastro" element={<Cadastro />} />
+
+      <Route path="/preview/coordenador" element={<CoordenadorDemo />} />
+      <Route path="/preview/doador" element={<DoadorDemo />} />
+      <Route path="/preview/voluntario" element={<VoluntarioDemo />} />
 
       <Route
         path="/coordenador"
