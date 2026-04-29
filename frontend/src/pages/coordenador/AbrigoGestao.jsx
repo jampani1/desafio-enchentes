@@ -214,9 +214,7 @@ export function AbrigoGestao() {
   )
 }
 
-/* ====================================================================
- * TAB PESSOAS
- * ==================================================================== */
+//TAB PESSOAS
 
 function TabPessoas({ abrigoId }) {
   const [pessoas, setPessoas] = useState(null)
@@ -486,9 +484,7 @@ function DialogPessoa({
   )
 }
 
-/* ====================================================================
- * TAB CASOS ESPECIAIS
- * ==================================================================== */
+//TAB CASOS ESPECIAIS
 
 function TabCasos({ abrigoId }) {
   const [casos, setCasos] = useState(null)
@@ -683,9 +679,7 @@ function DialogCaso({ open, onOpenChange, abrigoId, onSalvo }) {
   )
 }
 
-/* ====================================================================
- * TAB ESTOQUE
- * ==================================================================== */
+//TAB ESTOQUE
 
 function TabEstoque({ abrigoId }) {
   const { tipos, erro: tiposErro, nomeRecurso } = useCatalogo()
@@ -919,9 +913,7 @@ function DialogEstoque({
   )
 }
 
-/* ====================================================================
- * TAB NECESSIDADES
- * ==================================================================== */
+//TAB NECESSIDADES
 
 function TabNecessidades({ abrigoId }) {
   const { nomeRecurso, detalheRecurso } = useCatalogo()
